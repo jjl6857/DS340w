@@ -1,0 +1,215 @@
+---
+title: "Estimating Future Crime Rates in Los Angeles Based on Crime Data from 2020 to Present"
+author: "jiaxi li"
+format: pdf
+editor: visual
+---
+
+## Introduction
+
+This project aims to forecast future crime rates in Los Angeles by analyzing crime data from 2020 to the present. The goal is to explore how factors such as socio-economic changes, mobility patterns, and land-use influence crime dynamics and to use machine learning models to predict future trends. The study will help identify areas of concern, allowing law enforcement to allocate resources more effectively.
+
+### Motivations:
+
+-   **Infinite Exploration:** "No Man's Sky" delivers a unique sandbox experience, where players can explore countless planets, meet different alien species, and uncover cosmic secrets. The game's limitless nature not only sparks player curiosity but also serves as an excellent focus for our research into how such an expansive environment affects player involvement and loyalty.
+
+    **Dynamic Player Base:** It's important for game developers and marketers to understand changes in player engagement. We are keen to find trends connecting price adjustments to shifts in the number of players. Insights from this analysis could help in fine-tuning strategies to enhance player satisfaction and keep them engaged.
+
+    **Blockchain Economy:** The use of blockchain technology brings additional complexity to the game's economy, affecting how resources are valued and exchanged. This feature could significantly influence player actions, making it an interesting point for thorough investigation.
+
+### Goal of the Project:
+
+\
+Our main goal is to analyze and understand the historical data of "No Man's Sky," particularly focusing on player numbers and pricing trends. This study will allow us to explore several important questions:
+
+**Impact of Price Reductions:** How do sales and promotional events affect how many players are active? Is there a clear link between these price cuts and increased player activity?
+
+**Pricing Dynamics and Player Activity:** How do changes in the game's price relate to the levels of player activity? Which trends are most effective in attracting new players or keeping current ones?
+
+**Predictive Modeling:** Can machine learning models accurately forecast shifts in player activity based on observed pricing trends? Which methods and models provide the best accuracy and insights into player behaviors?
+
+## Illustration / Figure
+
+A figure or a diagram that illustrates the overall model or idea of your project. The idea is to make your report more accessible, especially to readers who are starting by skimming your work. For the project, taking a picture of a hand-drawn diagram is fine, as long as it's legible. PowerPoint is another option. You will not be penalized for hand-drawn illustrations -- you are graded on the design and illustrative power
+
+![](images/clipboard-2233500384.png)
+
+## Background & Related Work (2 points)
+
+*No Man’s Sky*, developed by Hello Games, is a groundbreaking exploration and survival game released in August 2016. Its defining feature is an infinite procedurally generated universe, where players can explore diverse planets, engage in space travel, and uncover cosmic mysteries. The game’s ambitious concept captured the attention of gamers worldwide, leading to high expectations and intense scrutiny during its launch.
+
+### Omissions and Context
+
+While the game initially faced criticism due to missing features promised pre-launch, Hello Games continued to improve and expand *No Man’s Sky* through regular updates. These updates introduced new gameplay mechanics, enhanced graphics, and addressed community feedback. The game’s evolution highlights the importance of ongoing development and player engagement.
+
+## Related Work
+
+1.  **Procedural Generation in Games**:
+
+    -   *Spore* (2008): Developed by Maxis, *Spore* also employed procedural generation to create entire galaxies, planets, and creatures. It allowed players to evolve their species from single-celled organisms to space-faring civilizations.
+
+    -   *Elite Dangerous* (2014): Frontier Developments’ space simulation game features a vast, procedurally generated galaxy with realistic astronomical data. Players can explore, trade, and engage in combat across thousands of star systems.
+
+2.  **Economic Models in Virtual Worlds**:
+
+    -   *EVE Online* (2003): CCP Games’ massively multiplayer online game has a complex player-driven economy. Resources, ships, and even political power are traded among players. Economic decisions impact gameplay and alliances.
+
+    -   *Cryptocurrencies and NFTs*: The rise of blockchain technology has influenced virtual economies. Games like *Decentraland* and *Axie Infinity* use non-fungible tokens (NFTs) for in-game assets, creating novel economic models.
+
+## Data Processing
+
+```{r}
+packages <- c(
+"tibble",
+"dplyr",
+"readr",
+"tidyr",
+"purrr",
+"broom",
+"magrittr",
+"corrplot",
+"caret",
+"rpart",
+"rpart.plot",
+"e1071",
+"torch",
+"luz"
+)
+# renv::install(packages)
+sapply(packages, require, character.only=T)
+```
+
+```{r}
+library(dplyr)
+
+# Read the CSV files
+player_counts <- read.csv("filtered_player.csv")
+price_history <- read.csv("filtered_price.csv")
+
+
+```
+
+```{r}
+head(player_counts)
+```
+
+```{r}
+head(price_history)
+```
+
+```{r}
+merged_data <- merge(player_counts, price_history, by = "DateTime", all = FALSE) 
+head(merged_data)
+```
+
+```{r}
+
+```
+
+## Architecture
+
+A description of the final model. Do not describe all the intermediate models that you have tried. Instead, present the model (or models) whose quantitative results you will show. These should be your most interesting models. Be as specific as you can while being concise. Readers should be able to reproduce a model similar enough to yours and obtain a similar performance.
+
+## Baseline Model
+
+Describe a simple, baseline model that you will compare your neural network against. This can be a simple model that you build.
+
+## Quantitative Results
+
+```{r}
+library(randomForest)
+library(Metrics)
+library(ggplot2)
+```
+
+## random forest
+
+```{r}
+merged_data$DateTime <- as.Date(merged_data$DateTime)
+set.seed(123) # For reproducibility
+training_indices <- sample(1:nrow(merged_data), nrow(merged_data) * 0.7)
+train_data <- merged_data[training_indices, ]
+test_data <- merged_data[-training_indices, ]
+
+# Build the baseline model (Linear Regression)
+baseline_model <- lm(Players ~ finalprice, data=train_data)
+baseline_pred <- predict(baseline_model, newdata=test_data)
+
+# Build the final model (Random Forest)
+final_model <- randomForest(Players ~ finalprice, data=train_data, ntree=500)
+final_pred <- predict(final_model, newdata=test_data)
+
+# Quantitative Results
+# Calculate MAE and R-squared for the baseline model
+baseline_mae <- mae(test_data$Players, baseline_pred)
+baseline_r_squared <- cor(test_data$Players, baseline_pred)^2
+
+# Calculate MAE and R-squared for the final model
+final_mae <- mae(test_data$Players, final_pred)
+final_r_squared <- cor(test_data$Players, final_pred)^2
+
+# Qualitative Results
+# Compare actual and predicted values
+qualitative_results <- data.frame(Actual=test_data$Players, Baseline_Predicted=baseline_pred, Final_Predicted=final_pred)
+head(qualitative_results)
+
+# Discussion
+# Here you would discuss the results, potentially including visualizations like:
+# A plot showing actual vs predicted player counts
+ggplot() +
+  geom_line(aes(x = test_data$DateTime, y = test_data$Players), color = 'blue') +
+  geom_line(aes(x = test_data$DateTime, y = final_pred), color = 'red') +
+  labs(title = "Actual vs Predicted Player Counts", x = "Date", y = "Player Count")
+
+```
+
+## Linear regression
+
+```{r}
+results <- cbind(test_data, Predicted = baseline_pred)
+
+ggplot(results, aes(x = DateTime, y = Players)) +
+  geom_line(aes(y = Predicted), color = 'red') +
+  geom_point(aes(y = Predicted), color = 'red') +
+  geom_line(color = 'blue') +
+  geom_point(color = 'blue') +
+  labs(title = "Actual vs Predicted Players Using Linear Regression",
+       x = "Date",
+       y = "Number of Players") +
+  theme_minimal()
+```
+
+A description of the quantitative measures of your result. What measurements can you use to illustrate how your model performs?
+
+## Qualitative Results
+
+```         
+```
+
+Include some sample outputs of your model, to help your readers better understand what your model can do. The qualitative results should also put your quantitative results into context (e.g. Why did your model perform well? Is there a type of input that the model does not do well on?)
+
+## Discussion
+
+```{r}
+
+```
+
+Discuss your results. Do you think your model is performing well? Why or why not? What is unusual, surprising, or interesting about your results? What did you learn?
+
+## Ethical Considerations
+
+```{r}
+
+```
+
+Description of a use of the system that could give rise to ethical issues. Are there limitations of your model? Your training data?
+
+(Note that the expectations are higher here than in the project proposal.)
+
+## Conclusion(Optional)
+
+```{r}
+
+```
+
+Summarize the whole report.
