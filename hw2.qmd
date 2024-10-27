@@ -5,7 +5,7 @@ toc: true
 title-block-banner: true
 title-block-style: default
 format: html
-# format: pdf
+
 ---
 
 [Link to the Github repository](https://github.com/STAT380/hw2.git)
@@ -41,6 +41,9 @@ library(cowplot)
 
 
 
+```{R}
+# install.packages("tinytex")
+```
 
 
 
