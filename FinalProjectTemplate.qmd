@@ -213,17 +213,17 @@ Describe a simple, baseline model that you will compare your neural network agai
 
 ## Quantitative Results
 
-```{}
+```         
 ```
 
 ## random forest
 
-```{}
+```         
 ```
 
 ## Linear regression
 
-```{}
+```         
 ```
 
 A description of the quantitative measures of your result. What measurements can you use to illustrate how your model performs?
