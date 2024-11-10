@@ -1,0 +1,151 @@
+---
+title: "Models for Statistics and Public Policy"
+author: "Mikaela Meyer"
+date: "2/15/2022"
+output: html_document
+---
+```{r}
+packages <- c(
+"readxl",
+"miceadds",
+"aods3",
+"carDat",
+"gridExtra"
+)
+# renv::install(packages)
+sapply(packages, require, character.only=T)
+```
+```{r}
+
+```
+
+
+
+
+```{r}
+library(dplyr)
+library(readxl)
+library(knitr)
+library(miceadds)
+library(aods3)
+library(car)
+library(tidyverse)
+library(ggplot2)
+library(grid)
+library(magrittr)
+#library(ggDiagnose)
+library(gridExtra)
+library(MASS)
+library(modelr)
+#library(ggrepel)
+```
+
+
+```{r, echo = FALSE}
+# Load your dataset
+crime_data <- read_csv("Crime_Data_from_2023_to_Present.csv") 
+
+# View first few rows to confirm structure
+head(crime_data)
+
+colnames(crime_data)
+
+# Convert relevant columns to appropriate types
+crime_data <- crime_data %>%
+  mutate(
+    `AREA NAME` = as.factor(`AREA NAME`),
+    `Crm Cd Desc` = as.factor(`Crm Cd Desc`),
+    `DATE OCC` = as.Date(`DATE OCC`)  # Ensure date columns are in date format
+  )
+```
+
+
+
+
+
+```{r, echo = FALSE}
+# Create Year and Month variables
+crime_data <- crime_data %>%
+  mutate(
+    Year = as.integer(format(`DATE OCC`, "%Y")),
+    Month = as.integer(format(`DATE OCC`, "%m"))
+  )
+```
+
+## burglary_model
+
+
+
+```{r,echo=FALSE}
+colnames(crime_data)[colnames(crime_data) == "AREA NAME"] <- "AREA.NAME"
+
+# Try the model again with correct syntax for `cluster`
+burglary_model <- glm.cluster(
+  formula = `Crm Cd Desc` == "BURGLARY FROM VEHICLE" ~ Year + Month + AREA.NAME,
+  data = crime_data,
+  cluster = "AREA.NAME",  # Enclose cluster column name in quotes
+  family = "poisson"
+)
+
+summary(burglary_model)
+```
+
+#### 
+
+```{r,echo=FALSE}
+# Monthly trend for a specific crime type (e.g., BURGLARY FROM VEHICLE)
+burglary_data <- crime_data %>%
+  filter(`Crm Cd Desc` == "BURGLARY FROM VEHICLE") %>%
+  group_by(Month) %>%
+  summarize(Count = n())
+
+# Check for missing values
+summary(burglary_data)
+
+burglary_data <- burglary_data %>% drop_na(Month, Count)
+
+# Plot using ggplot2
+ggplot(burglary_data, aes(x = Month, y = Count)) +
+  geom_line() +
+  labs(title = "Monthly Burglary Incidents", x = "Month", y = "Count")
+```
+
+### Biweekly
+
+```{r, echo = FALSE}
+library(lubridate)
+
+crime_data <- crime_data %>%
+  mutate(
+    Biweek = ceiling(day(`DATE OCC`) / 14) + (month(`DATE OCC`) - 1) * 2  # Biweekly period within the year
+  )
+```
+
+
+```{r}
+# Biweekly trend for a specific crime type (e.g., BURGLARY FROM VEHICLE)
+biweek_burglary_data <- crime_data %>%
+  filter(`Crm Cd Desc` == "BURGLARY FROM VEHICLE") %>%
+  group_by(Biweek) %>%
+  summarize(Count = n())
+
+sum(is.na(biweek_burglary_data$Biweek))
+biweek_burglary_data <- biweek_burglary_data %>% drop_na(Biweek)
+
+# Plot using ggplot2
+ggplot(biweek_burglary_data, aes(x = Biweek, y = Count)) +
+  geom_line() +
+  labs(title = "Biweekly Burglary Incidents", x = "Biweek", y = "Count")
+```
+
+
+
+
+
+
+
+
+
+
+
+
