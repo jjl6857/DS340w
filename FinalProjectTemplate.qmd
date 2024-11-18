@@ -63,6 +63,11 @@ packages <- c(
 "tibble",
 "dplyr",
 "readr",
+"readxl",
+"miceadds",
+"aods3",
+"carDat",
+"gridExtra",
 "tidyr",
 "purrr",
 "broom",
@@ -80,6 +85,7 @@ sapply(packages, require, character.only=T)
 ```
 
 ```{r}
+library(e1071)
 library(caret)
 ```
 
@@ -129,6 +135,7 @@ crime_data$AREA.NAME <- as.factor(crime_data$AREA.NAME)
 crime_data$Crm.Cd.Desc <- as.factor(crime_data$Crm.Cd.Desc)
 crime_data$Vict.Sex <- as.factor(crime_data$Vict.Sex)
 
+
 # Step 1.4: Extract day of the week, month, and time of day from date and time columns
 crime_data$Day_of_Week <- weekdays(crime_data$DATE.OCC)
 crime_data$Month <- month(crime_data$DATE.OCC, label = TRUE)
@@ -151,7 +158,9 @@ single_class_rows <- crime_data %>%
 main_data <- anti_join(crime_data, single_class_rows)
 ```
 
-## 
+```{r}
+head(main_data)
+```
 
 ## Decision Tree Model building
 
@@ -211,14 +220,53 @@ ggplot2::ggplot(importance, aes(x = reorder(rownames(importance), Overall), y = 
 
 Describe a simple, baseline model that you will compare your neural network against. This can be a simple model that you build.
 
-## Quantitative Results
+## random forest
 
 ```         
 ```
 
-## random forest
+```{r}
+library(randomForest)
+rf_model <- randomForest(Crm.Cd.Desc ~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day, data = train_data, ntree = 10)
+# print(rf_model)
+```
 
 ```         
+```
+
+```{r}
+# Extract feature importance
+importance_matrix <- as.data.frame(importance(rf_model))
+
+# Check the structure of importance_matrix
+print(importance_matrix)
+
+# Ensure feature names are in a separate column
+importance_matrix <- importance_matrix %>%
+  tibble::rownames_to_column(var = "Feature") %>%  # Create a column for feature names
+  select(Feature, MeanDecreaseGini)  # Select only the needed columns
+
+# Remove duplicates (if any)
+importance_matrix <- importance_matrix %>% distinct()
+
+```
+
+```{r}
+ggplot(importance_matrix, aes(x = reorder(Feature, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Feature Importance in Random Forest Model",
+    x = "Features",
+    y = "Mean Decrease in Gini"
+  ) +
+  theme_minimal()
+
+
+```
+
+```{r}
+
 ```
 
 ## Linear regression
@@ -226,7 +274,112 @@ Describe a simple, baseline model that you will compare your neural network agai
 ```         
 ```
 
-A description of the quantitative measures of your result. What measurements can you use to illustrate how your model performs?
+```{r}
+train_data$Crm.Cd.Desc <- as.numeric(as.factor(train_data$Crm.Cd.Desc))
+test_data$Crm.Cd.Desc <- as.numeric(as.factor(test_data$Crm.Cd.Desc))
+```
+
+```{r}
+linear_model <- lm(Crm.Cd.Desc ~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day, data = train_data)
+
+# View the model's summary
+summary(linear_model)
+```
+
+```{r}
+predictions <- predict(linear_model, test_data)
+# Calculate Mean Squared Error (MSE)
+mse <- mean((predictions - test_data$Crm.Cd.Desc)^2)
+cat("Mean Squared Error (MSE):", mse, "\n")
+comparison <- data.frame(Actual = test_data$Crm.Cd.Desc, Predicted = predictions)
+
+```
+
+```{r}
+comparison <- data.frame(
+  Category = c(rep("Actual", length(test_data$Crm.Cd.Desc)), rep("Predicted", length(predictions))),
+  Values = c(as.numeric(test_data$Crm.Cd.Desc), as.numeric(predictions))
+)
+```
+
+```{r}
+ggplot(comparison, aes(x = Values, fill = Category)) +
+  geom_density(alpha = 0.5) +
+  labs(
+    title = "Linear Regression: Actual vs Predicted Crime Codes",
+    x = "Crime Codes",
+    y = "Density"
+  ) +
+  scale_fill_manual(values = c("Actual" = "blue", "Predicted" = "green")) +
+  theme_minimal()
+```
+
+## XGBoost Model
+
+```{r}
+
+library(xgboost)
+```
+
+```{r}
+target_variable <- "Crm.Cd.Desc"
+train_matrix <- model.matrix(~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day - 1, data = train_data)
+test_matrix <- model.matrix(~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day - 1, data = test_data)
+
+xgb_train <- xgb.DMatrix(data = train_matrix, label = as.numeric(train_data[[target_variable]]) - 1)
+xgb_test <- xgb.DMatrix(data = test_matrix, label = as.numeric(test_data[[target_variable]]) - 1)
+
+
+```
+
+```{r}
+xgb_params <- list(
+  objective = "multi:softmax",                # Multiclass classification
+  num_class = length(unique(train_data[[target_variable]])), # Number of classes
+  eval_metric = "merror",                    # Error evaluation metric
+  max_depth = 6,                             # Maximum depth of trees
+  eta = 0.3,                                 # Learning rate
+  gamma = 0,                                 # Minimum loss reduction
+  subsample = 0.8,                           # Subsample ratio of the training set
+  colsample_bytree = 0.8                     # Subsample ratio of columns
+)
+
+# Train the XGBoost model
+xgb_model <- xgb.train(
+  params = xgb_params,
+  data = xgb_train,
+  nrounds = 100
+)
+```
+
+```{r}
+# Ensure the target variable in test_data is a factor
+test_data[[target_variable]] <- factor(test_data[[target_variable]])
+xgb_predictions <- predict(xgb_model, xgb_test)
+# Convert predictions to a factor and align levels with the target variable
+predicted_classes <- factor(
+  xgb_predictions + 1, 
+  levels = levels(test_data[[target_variable]])
+)
+
+# Evaluate performance using the confusion matrix
+library(caret)
+xgb_confusion <- confusionMatrix(
+  predicted_classes, 
+  test_data[[target_variable]]
+)
+
+# Print confusion matrix and accuracy
+print(xgb_confusion)
+
+```
+
+```{r}
+xgb_importance <- xgb.importance(feature_names = colnames(train_matrix), model = xgb_model)
+
+# Plot feature importance
+xgb.plot.importance(xgb_importance, main = "XGBoost Feature Importance")
+```
 
 ## Qualitative Results
 
