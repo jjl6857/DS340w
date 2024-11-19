@@ -108,10 +108,6 @@ head(crime_data)
 ```
 
 ```{r}
-colnames(crime_data)
-```
-
-```{r}
 sapply(crime_data, function(x) sum(is.na(x)))
 ```
 
@@ -122,7 +118,6 @@ crime_data <- crime_data %>%
 
 ```{r}
 crime_data$Vict.Age[is.na(crime_data$Vict.Age)] <- median(crime_data$Vict.Age, na.rm = TRUE)
-
 ```
 
 ```{r}
@@ -131,9 +126,6 @@ crime_data$Date.Rptd <- as.Date(crime_data$Date.Rptd, format = "%m/%d/%Y")
 ```
 
 ```{r}
-crime_data$AREA.NAME <- as.factor(crime_data$AREA.NAME)
-crime_data$Crm.Cd.Desc <- as.factor(crime_data$Crm.Cd.Desc)
-crime_data$Vict.Sex <- as.factor(crime_data$Vict.Sex)
 
 
 # Step 1.4: Extract day of the week, month, and time of day from date and time columns
@@ -147,6 +139,11 @@ crime_data$Time_of_Day <- case_when(
   crime_data$TIME.OCC >= 1200 & crime_data$TIME.OCC < 1800 ~ "Afternoon",
   TRUE ~ "Evening"
 )
+
+
+crime_data$AREA.NAME <- as.factor(crime_data$AREA.NAME)
+crime_data$Crm.Cd.Desc <- as.factor(crime_data$Crm.Cd.Desc)
+crime_data$Vict.Sex <- as.factor(crime_data$Vict.Sex)
 ```
 
 ```{r}
@@ -172,6 +169,7 @@ test_data <- main_data[-trainIndex, ]
 
 train_data <- bind_rows(train_data, single_class_rows)
 
+
 ```
 
 ```{r}
@@ -185,7 +183,7 @@ summary(tree_model)
 ```
 
 ```{r}
-predictions <- predict(tree_model, test_data, type = "class")
+tree_predictions <- predict(tree_model, test_data, type = "class")
 ```
 
 ```{r}
@@ -227,7 +225,12 @@ Describe a simple, baseline model that you will compare your neural network agai
 
 ```{r}
 library(randomForest)
-rf_model <- randomForest(Crm.Cd.Desc ~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day, data = train_data, ntree = 10)
+rf_model <- randomForest(
+  Crm.Cd.Desc ~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day,
+  data = train_data,
+  ntree = 10,
+  mtry = 3
+)
 # print(rf_model)
 ```
 
@@ -383,7 +386,61 @@ xgb.plot.importance(xgb_importance, main = "XGBoost Feature Importance")
 
 ## Qualitative Results
 
+```{r}
+# Define a results table to store metrics
+results <- data.frame(Model = character(), Accuracy = numeric(), stringsAsFactors = FALSE)
+```
+
+```{r}
+tree_model <- rpart(Crm.Cd.Desc ~ AREA.NAME + Vict.Age + Day_of_Week + Month + Time_of_Day, 
+                    data = train_data, method = "class")
+
+# Predict and calculate accuracy
+tree_predictions <- predict(tree_model, test_data, type = "class")
+levels(train_data$Crm.Cd.Desc) <- union(levels(train_data$Crm.Cd.Desc), levels(test_data$Crm.Cd.Desc))
+levels(test_data$Crm.Cd.Desc) <- levels(train_data$Crm.Cd.Desc)
+tree_predictions <- factor(tree_predictions, levels = levels(test_data$Crm.Cd.Desc))
+tree_accuracy <- sum(tree_predictions == test_data$Crm.Cd.Desc) / nrow(test_data)
+results <- rbind(results, data.frame(Model = "Decision Tree", Accuracy = tree_accuracy))
+
+```
+
+```{r}
+train_data$Crm.Cd.Desc <- as.numeric(as.factor(train_data$Crm.Cd.Desc))
+test_data$Crm.Cd.Desc <- as.numeric(as.factor(test_data$Crm.Cd.Desc))
+linear_predictions <- predict(linear_model, test_data)
+linear_accuracy <- 1 - mean((linear_predictions - test_data$Crm.Cd.Desc)^2) / var(test_data$Crm.Cd.Desc)
+results <- rbind(results, data.frame(Model = "Linear Regression", Accuracy = linear_accuracy))
+
+```
+
+```{r}
+xgb_predictions <- predict(xgb_model, xgb_test)
+xgb_accuracy <- sum(xgb_predictions == test_data$Crm.Cd.Desc - 1) / nrow(test_data)
+results <- rbind(results, data.frame(Model = "XGBoost", Accuracy = xgb_accuracy))
+
+```
+
 ```         
+```
+
+```{r}
+
+# Predict and calculate accuracy
+rf_predictions <- predict(rf_model, test_data)
+rf_accuracy <- sum(rf_predictions == test_data$Crm.Cd.Desc) / nrow(test_data)
+results <- rbind(results, data.frame(Model = "Random Forest", Accuracy = rf_accuracy))
+```
+
+```{r}
+print(results)
+```
+
+```{r}
+ggplot(results, aes(x = Model, y = Accuracy, fill = Model)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Model Accuracy Comparison", x = "Model", y = "Accuracy") +
+  theme_minimal()
 ```
 
 Include some sample outputs of your model, to help your readers better understand what your model can do. The qualitative results should also put your quantitative results into context (e.g. Why did your model perform well? Is there a type of input that the model does not do well on?)
